@@ -13,6 +13,9 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
 
+// Retardo de salida de la pen por fantasma, en frames (~60fps): 0s, 2s, 4s, 6s.
+const RELEASE_DELAYS = { blinky: 0, pinky: 120, inky: 240, clyde: 360 };
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -27,6 +30,7 @@ function createGame() {
     state: 'start',
     score: 0,
     lives: 3,
+    frame: 0,
     dotsRemaining: dots,
     grid,
     pacman: {
@@ -41,7 +45,9 @@ function createGame() {
       y: g.y,
       dir: 'up',
       speed: GHOST_SPEED,
+      name: g.name,
       kind: g.kind,
+      releaseFrame: RELEASE_DELAYS[ g.kind ],
     } ) ),
   };
 }
@@ -145,6 +151,9 @@ function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
+  // Aun en la pen: espera su turno de salida.
+  if ( game.frame < g.releaseFrame ) return;
+
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
@@ -176,6 +185,7 @@ function collides( a, b ) {
 }
 
 function update( game ) {
+  game.frame++;
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
