@@ -126,6 +126,16 @@ function ghostTarget( game, g ) {
   switch ( g.kind ) {
     case 'pinky': // emboscada: 4 celdas por delante de Pacman
       return { x: px + d.x * 4, y: py + d.y * 4 };
+    case 'inky': { // flanqueo: dobla el vector Blinky -> 2 celdas delante de Pacman
+      const blinky = game.ghosts.find( ( h ) => h.kind === 'blinky' );
+      const ax = px + d.x * 2;
+      const ay = py + d.y * 2;
+      return { x: 2 * ax - Math.round( blinky.x ), y: 2 * ay - Math.round( blinky.y ) };
+    }
+    case 'clyde': { // timido: persigue de lejos, se retira a su esquina de cerca
+      const far = Math.hypot( px - Math.round( g.x ), py - Math.round( g.y ) ) > 8;
+      return far ? { x: px, y: py } : { x: 1, y: 29 };
+    }
     case 'blinky': // persecucion directa
     default:
       return { x: px, y: py };
