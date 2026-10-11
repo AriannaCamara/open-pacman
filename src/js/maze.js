@@ -51,9 +51,13 @@ const MAZE = MAZE_STR.map( ( row ) => row.split( '' ).map( parseTile ) );
 
 const TUNNEL_ROW = 14;
 const PACMAN_START = { x: 13, y: 23 };
+// Los 4 fantasmas arrancan dentro de la pen (fila 14, cols 11-16).
+// El orden fija su color en render.js (GHOST_COLORS).
 const GHOST_STARTS = [
-  { x: 13, y: 14, kind: 'hunter' }, // dentro de la pen
-  { x: 14, y: 14, kind: 'random' }, // dentro de la pen
+  { x: 13, y: 14, name: 'blinky', kind: 'blinky' }, // rojo, persigue
+  { x: 14, y: 14, name: 'pinky', kind: 'pinky' },   // cian, emboscada
+  { x: 12, y: 14, name: 'inky', kind: 'inky' },     // rosa, flanqueo
+  { x: 15, y: 14, name: 'clyde', kind: 'clyde' },   // naranja, timido
 ];
 
 window.MAZE = MAZE;

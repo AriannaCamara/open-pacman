@@ -13,6 +13,9 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
 
+// Retardo de salida de la pen por fantasma, en frames (~60fps): 0s, 2s, 4s, 6s.
+const RELEASE_DELAYS = { blinky: 0, pinky: 120, inky: 240, clyde: 360 };
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -27,6 +30,7 @@ function createGame() {
     state: 'start',
     score: 0,
     lives: 3,
+    frame: 0,
     dotsRemaining: dots,
     grid,
     pacman: {
@@ -41,7 +45,9 @@ function createGame() {
       y: g.y,
       dir: 'up',
       speed: GHOST_SPEED,
+      name: g.name,
       kind: g.kind,
+      releaseFrame: RELEASE_DELAYS[ g.kind ],
     } ) ),
   };
 }
@@ -110,40 +116,66 @@ function movePacman( game ) {
   wrapTunnel( p, width );
 }
 
-function decideGhost( game, g ) {
-  const grid = game.grid;
+// Celda objetivo de cada fantasma segun su comportamiento (kind).
+function ghostTarget( game, g ) {
   const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+  const d = DIRS[ p.dir ];
 
+  switch ( g.kind ) {
+    case 'pinky': // emboscada: 4 celdas por delante de Pacman
+      return { x: px + d.x * 4, y: py + d.y * 4 };
+    case 'inky': { // flanqueo: dobla el vector Blinky -> 2 celdas delante de Pacman
+      const blinky = game.ghosts.find( ( h ) => h.kind === 'blinky' );
+      const ax = px + d.x * 2;
+      const ay = py + d.y * 2;
+      return { x: 2 * ax - Math.round( blinky.x ), y: 2 * ay - Math.round( blinky.y ) };
+    }
+    case 'clyde': { // timido: persigue de lejos, se retira a su esquina de cerca
+      const far = Math.hypot( px - Math.round( g.x ), py - Math.round( g.y ) ) > 8;
+      return far ? { x: px, y: py } : { x: 1, y: 29 };
+    }
+    case 'blinky': // persecucion directa
+    default:
+      return { x: px, y: py };
+  }
+}
+
+// Elige la direccion valida que mas acerca la siguiente celda al objetivo.
+// Nunca invierte el sentido salvo en un callejon sin salida.
+function chooseBestDir( game, g, target ) {
+  const grid = game.grid;
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
   );
-  // Sin salida (callejon): permitir el giro de 180.
-  const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+  if ( !options.length ) return OPPOSITE[ g.dir ];
 
-  if ( g.kind === 'hunter' ) {
-    const px = Math.round( p.x );
-    const py = Math.round( p.y );
-    let best = choices[ 0 ];
-    let bestDist = Infinity;
-    for ( const dir of choices ) {
-      const d = DIRS[ dir ];
-      const nx = g.x + d.x;
-      const ny = g.y + d.y;
-      const dist = Math.abs( nx - px ) + Math.abs( ny - py );
-      if ( dist < bestDist ) {
-        bestDist = dist;
-        best = dir;
-      }
+  let best = options[ 0 ];
+  let bestDist = Infinity;
+  for ( const dir of options ) {
+    const d = DIRS[ dir ];
+    const nx = g.x + d.x;
+    const ny = g.y + d.y;
+    const dist = Math.abs( nx - target.x ) + Math.abs( ny - target.y );
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = dir;
     }
-    g.dir = best;
-  } else {
-    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
   }
+  return best;
+}
+
+function decideGhost( game, g ) {
+  g.dir = chooseBestDir( game, g, ghostTarget( game, g ) );
 }
 
 function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
+
+  // Aun en la pen: espera su turno de salida.
+  if ( game.frame < g.releaseFrame ) return;
 
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
@@ -168,6 +200,7 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
+    g.releaseFrame = game.frame + RELEASE_DELAYS[ g.kind ];
   } );
 }
 
@@ -176,6 +209,7 @@ function collides( a, b ) {
 }
 
 function update( game ) {
+  game.frame++;
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
